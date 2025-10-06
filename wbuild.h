@@ -1,7 +1,14 @@
+/*
+ * its-useless/wbuild
+ * aceinetx 2021-2025
+ */
 #ifndef WBUILD_H
 #define WBUILD_H
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 /// ARENA
 typedef struct {
@@ -19,6 +26,7 @@ void _target_depends(char* target, const char* const* depends);
 void _target_commands(char* target, const char* const* commands);
 
 #ifdef WBUILD_IMPL
+/// ARENA
 Arena arena_new(size_t size) {
     Arena arena;
     arena.next = arena.data = malloc(size);
@@ -40,6 +48,27 @@ void arena_free(Arena* arena) {
     free(arena->data);
 }
 
+static Arena global_arena;
+    #define aalloc(size) arena_alloc(&global_arena, size)
+
+/// UTIL
+static void quit(int code) {
+    arena_free(&global_arena);
+    exit(code);
+}
+
+/// FILESYSTEM
+static bool fexists(const char* name) {
+    return (access(name, F_OK) != -1);
+}
+
+static uint64_t get_modified_date(const char* name) {
+    struct stat file_stat;
+    if (stat(name, &file_stat) == -1)
+        return 0;
+    return file_stat.st_mtime;
+}
+
 /// TARGET
 typedef struct {
     char* output;
@@ -49,6 +78,8 @@ typedef struct {
 
     char** commands;
     size_t commands_len;
+
+    bool is_built;
 } Target;
 
 typedef struct TargetNode {
@@ -56,17 +87,117 @@ typedef struct TargetNode {
     struct TargetNode* next;
 } TargetNode;
 
-static Arena global_arena;
 static TargetNode targets = {0};
-    #define aalloc(size) arena_alloc(&global_arena, size)
+static size_t built_targets = 0;
 
-static void quit(int code) {
-    arena_free(&global_arena);
-    exit(code);
+size_t targets_len() {
+    size_t len = 0;
+
+    TargetNode* node = &targets;
+    for (;;) {
+        if (!node->target || !node)
+            break;
+
+        len++;
+
+        node = node->next;
+    }
+
+    return len;
+}
+
+static int get_percentage() {
+    int percent = 100 / targets_len() * (built_targets);
+
+    if (percent > 100)
+        percent = 100;
+    return percent;
+}
+
+bool target_needs_building(Target* target) {
+    bool modified = false;
+    if (target->is_built)
+        return false;
+
+    for (size_t i = 0; i < target->depends_len; i++) {
+        char* dependency = target->depends[i];
+
+        TargetNode* node = &targets;
+        for (;;) {
+            if (!node->target || !node)
+                break;
+
+            if (strcmp(node->target->output, dependency) != 0) {
+                node = node->next;
+                continue;
+            }
+
+            if (target_needs_building(node->target)) {
+                return true;
+            }
+
+            node = node->next;
+        }
+    }
+
+    uint64_t output_date = get_modified_date(target->output);
+    for (size_t i = 0; i < target->depends_len; i++) {
+        char* dependency = target->depends[i];
+
+        if (get_modified_date(dependency) >= output_date) {
+            modified = true;
+            break;
+        }
+    }
+
+    return modified;
+}
+
+bool target_build(Target* target) {
+    if (!target_needs_building(target))
+        return true;
+
+    built_targets++;
+    int percent = get_percentage();
+
+    printf("[%3d] building %s\n", percent, target->output);
+
+    for (size_t i = 0; i < target->depends_len; i++) {
+        char* dependency = target->depends[i];
+
+        TargetNode* node = &targets;
+        for (;;) {
+            if (!node->target || !node)
+                break;
+
+            if (strcmp(node->target->output, dependency) == 0) {
+                if (!target_build(node->target))
+                    return false;
+                break;
+            }
+            node = node->next;
+        }
+
+        if (!fexists(dependency))
+            return false;
+    }
+
+    percent = get_percentage();
+    for (size_t i = 0; i < target->commands_len; i++) {
+        char* command = target->commands[i];
+
+        printf("[%3d] running build cmd for %s\n", percent, target->output);
+
+        system(command);
+    }
+    target->is_built = true;
+
+    return true;
 }
 
 void add_target(char* output) {
     Target* target = aalloc(sizeof(Target));
+    target->is_built = false;
 
     size_t output_sz = strlen(output) + 1;
     target->output = aalloc(output_sz);
@@ -92,7 +223,7 @@ static Target* find_target(char* target) {
     TargetNode* node = &targets;
     Target* tgt = NULL;
     for (;;) {
-        if (!node->target)
+        if (!node->target || !node)
             break;
         if (strcmp(node->target->output, target) == 0) {
             tgt = node->target;
@@ -163,13 +294,34 @@ int main(int argc, char** argv) {
         quit(1);
     }
 
+    if ((res = wbuild_main(argc, argv)) != 0) {
+        quit(res);
+    }
     if (strcmp(argv[1], "build") == 0) {
-        if ((res = wbuild_main(argc, argv)) != 0) {
-            quit(res);
+        TargetNode* node = &targets;
+        for (;;) {
+            if (!node->target || !node)
+                break;
+
+            if (!target_build(node->target)) {
+                printf("[ ! ] build fail for %s\n", node->target->output);
+                quit(1);
+            }
+            node = node->next;
         }
     } else if (strcmp(argv[1], "clean") == 0) {
+        TargetNode* node = &targets;
+        for (;;) {
+            if (!node->target || !node)
+                break;
+
+            printf("[...] clean %s\n", node->target->output);
+            remove(node->target->output);
+
+            node = node->next;
+        }
     } else {
-        printf("[...] invalid action: %s", argv[1]);
+        printf("[...] invalid action: %s\n", argv[1]);
         quit(1);
     }
 
