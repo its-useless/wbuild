@@ -296,9 +296,9 @@ int main(int argc, char** argv) {
 
     global_arena = arena_new(0x1000);
 
-    puts("[...] useless/wbuild aceinetx 2021-2025");
+    puts("[    ] useless/wbuild aceinetx 2021-2025");
     if (argc < 2) {
-        puts("[...] no action provided, actions: build | clean");
+        puts("[    ] no action provided, actions: build | clean");
         quit(1);
     }
 
@@ -312,7 +312,7 @@ int main(int argc, char** argv) {
                 break;
 
             if (!target_build(node->target)) {
-                printf("[ ! ] build fail for %s\n", node->target->output);
+                printf("[!  !] build fail for %s\n", node->target->output);
                 quit(1);
             }
             node = node->next;
@@ -323,13 +323,13 @@ int main(int argc, char** argv) {
             if (!node->target || !node)
                 break;
 
-            printf("[...] clean %s\n", node->target->output);
+            printf("[    ] clean %s\n", node->target->output);
             remove(node->target->output);
 
             node = node->next;
         }
     } else {
-        printf("[...] invalid action: %s\n", argv[1]);
+        printf("[    ] invalid action: %s\n", argv[1]);
         quit(1);
     }
 
