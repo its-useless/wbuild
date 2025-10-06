@@ -232,7 +232,7 @@ void add_target(char* output) {
     }
 }
 
-static Target* find_target(char* target) {
+static Target* find_target_null(char* target) {
     TargetNode* node = &targets;
     Target* tgt = NULL;
     for (;;) {
@@ -244,6 +244,11 @@ static Target* find_target(char* target) {
         }
         node = node->next;
     }
+    return tgt;
+}
+
+static Target* find_target(char* target) {
+    Target* tgt = find_target_null(target);
     if (!tgt) {
         printf("[...] find_target failed: no target %s\n", target);
         quit(1);
@@ -289,6 +294,28 @@ void _target_commands(char* target, const char* const* commands) {
     tgt->commands_len = count;
 }
 
+static void print_spaces(size_t n) {
+    if (n == 0)
+        return;
+    printf("%*c", n, ' ');
+}
+
+static void target_graph(Target* target, size_t indent, size_t spacing) {
+    print_spaces(indent);
+    printf("- %s\n", target->output);
+
+    for (size_t i = 0; i < target->depends_len; i++) {
+        char* dependency = target->depends[i];
+        Target* dependency_target = find_target_null(dependency);
+        if (!dependency_target) {
+            print_spaces(indent + spacing);
+            printf("- %s\n", dependency);
+        } else {
+            target_graph(dependency_target, indent + spacing, spacing);
+        }
+    }
+}
+
 int wbuild_main(int, char**);
 
 int main(int argc, char** argv) {
@@ -298,7 +325,7 @@ int main(int argc, char** argv) {
 
     puts("[    ] useless/wbuild aceinetx 2021-2025");
     if (argc < 2) {
-        puts("[    ] no action provided, actions: build | clean");
+        puts("[    ] no action provided, actions: build | clean | graph");
         quit(1);
     }
 
@@ -325,6 +352,16 @@ int main(int argc, char** argv) {
 
             printf("[    ] clean %s\n", node->target->output);
             remove(node->target->output);
+
+            node = node->next;
+        }
+    } else if (strcmp(argv[1], "graph") == 0) {
+        TargetNode* node = &targets;
+        for (;;) {
+            if (!node->target || !node)
+                break;
+
+            target_graph(node->target, 0, 2);
 
             node = node->next;
         }
