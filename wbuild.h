@@ -116,7 +116,11 @@ size_t targets_len() {
 }
 
 static int get_percentage() {
-    int percent = 100 / targets_len() * (built_targets);
+    size_t len = targets_len();
+    if (len == built_targets)
+        return 100;
+
+    int percent = 100 / len * (built_targets);
 
     if (percent > 100)
         percent = 100;
@@ -169,7 +173,7 @@ bool target_build(Target* target) {
     built_targets++;
     int percent = get_percentage();
 
-    printf("[%3d] building %s\n", percent, target->output);
+    printf("[%3d%%] building %s\n", percent, target->output);
 
     for (size_t i = 0; i < target->depends_len; i++) {
         char* dependency = target->depends[i];
@@ -195,7 +199,7 @@ bool target_build(Target* target) {
     for (size_t i = 0; i < target->commands_len; i++) {
         char* command = target->commands[i];
 
-        printf("[%3d] running build cmd for %s\n", percent, target->output);
+        printf("[%3d%%] running build cmd for %s\n", percent, target->output);
 
         system(command);
     }
