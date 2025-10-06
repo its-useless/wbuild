@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
 
     puts("[    ] useless/wbuild aceinetx 2021-2025");
     if (argc < 2) {
-        puts("[    ] no action provided, actions: build | clean");
+        puts("[    ] no action provided, actions: build | clean | help");
         quit(1);
     }
 
@@ -328,6 +328,11 @@ int main(int argc, char** argv) {
 
             node = node->next;
         }
+    } else if (strcmp(argv[1], "help") == 0) {
+        puts("actions:");
+        puts("- build: builds targets");
+        puts("- clean: clean targets outputs");
+        puts("- help: prints this message");
     } else {
         printf("[    ] invalid action: %s\n", argv[1]);
         quit(1);
