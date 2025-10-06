@@ -25,6 +25,11 @@ void add_target(char* output);
 void _target_depends(char* target, const char* const* depends);
 void _target_commands(char* target, const char* const* commands);
 
+#define target_depends(target, ...) \
+    _target_depends(target, (const char* const[]) {__VA_ARGS__, NULL});
+#define target_commands(target, ...) \
+    _target_commands(target, (const char* const[]) {__VA_ARGS__, NULL});
+
 #ifdef WBUILD_IMPL
 /// ARENA
 Arena arena_new(size_t size) {
@@ -275,11 +280,6 @@ void _target_commands(char* target, const char* const* commands) {
     tgt->commands = array;
     tgt->commands_len = count;
 }
-
-    #define target_depends(target, ...) \
-        _target_depends(target, (const char* const[]) {__VA_ARGS__, NULL});
-    #define target_commands(target, ...) \
-        _target_commands(target, (const char* const[]) {__VA_ARGS__, NULL});
 
 int wbuild_main(int, char**);
 
