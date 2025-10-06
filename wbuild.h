@@ -5,8 +5,10 @@
 #ifndef WBUILD_H
 #define WBUILD_H
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -68,10 +70,12 @@ static bool fexists(const char* name) {
 }
 
 static uint64_t get_modified_date(const char* name) {
-    struct stat file_stat;
-    if (stat(name, &file_stat) == -1)
+    struct stat st;
+    if (stat(name, &st) != 0)
         return 0;
-    return file_stat.st_mtime;
+    int64_t sec = (int64_t)st.st_mtim.tv_sec;
+    int64_t nsec = (int64_t)st.st_mtim.tv_nsec;
+    return sec * 1000 + nsec / 1000000;
 }
 
 /// TARGET
